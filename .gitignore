@@ -1,0 +1,36 @@
+# Xcode / Swift
+build/
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.xccheckout
+*.moved-aside
+*.xcuserstate
+*.xcscmblueprint
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IPA / Archive output
+*.ipa
+*.dSYM.zip
+*.xcarchive/
+Payload/
+
+# xcodegen cache
+# (giữ project.yml, bỏ file sinh ra cục bộ nếu không muốn commit)
+# Timezy.xcodeproj/
+
+# GitHub Actions local
+.env

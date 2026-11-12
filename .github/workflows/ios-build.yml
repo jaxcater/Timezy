@@ -1,0 +1,43 @@
+name: iOS Build (unsigned IPA)
+
+# Push lên GitHub là tự build trên máy macOS của GitHub Actions.
+# Ra file Timezy-unsigned.ipa → tải về → ký bằng Sideloadly/AltStore rồi cài.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cài xcodegen
+        run: brew install xcodegen
+
+      - name: Sinh .xcodeproj
+        working-directory: .
+        run: xcodegen generate
+
+      - name: Build archive (không ký)
+        run: |
+          xcodebuild archive \
+            -project Timezy.xcodeproj \
+            -scheme Timezy \
+            -configuration Release \
+            -archivePath build/Timezy.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Đóng gói IPA unsigned
+        run: |
+          mkdir -p Payload
+          cp -R build/Timezy.xcarchive/Products/Applications/Timezy.app Payload/
+          zip -r Timezy-unsigned.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Timezy-unsigned
+          path: Timezy-unsigned.ipa
