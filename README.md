@@ -1,159 +1,67 @@
-# Timezy — App quản lý thời gian & nhắc lịch (SwiftUI, iOS)
+# Timezy
 
-> Máy bạn đang dùng **Windows** nên **không build trực tiếp ra file `.ipa`** được.
-> Source viết chuẩn SwiftUI, bạn chỉ cần 1 máy Mac (hoặc CI macOS đám mây)
-> là build được IPA.
+Ứng dụng lịch cá nhân **iPhone / iOS 17+**, viết bằng SwiftUI, giao diện tối. Dự án đã chuyển từ bản Pomodoro sang lịch và nhắc hẹn.
 
-## Timezy là gì
+## Chức năng có trong mã nguồn
 
-Timezy là ứng dụng quản lý thời gian hoạt động như một **cuốn lịch cá nhân**:
-người dùng thêm lịch trình của mình vào, app **nhắc nhở trước ngày diễn ra** để tránh quên.
+- Xem lịch ngày, 7 ngày, chọn ngày trên lịch tháng; tìm tên và địa điểm trong phạm vi đang xem.
+- Thêm, sửa, xóa lịch thủ công; nhắc trước phút/giờ/ngày; lặp hằng ngày hoặc hằng tuần.
+- Nhập văn bản → AI → bảng xem trước có thể chỉnh sửa → xác nhận lưu.
+- Nhận dạng giọng nói tiếng Việt trực tiếp bằng **Apple Speech (`vi-VN`)**, hiện chữ khi nói. Chờ kết quả cuối tối đa 3 giây khi dừng; có thể chỉnh bản chép trước khi phân tích.
+- AI dùng API key người dùng: OpenAI Chat Completions, Gemini GenerateContent, Anthropic Messages và endpoint tương thích. Model do người dùng nhập, không khóa vào một model.
+- API key lưu Keychain, không ghi vào Firebase hay UserDefaults.
+- Google Sign-In + Firebase Auth + Firestore đồng bộ lịch theo UID, có trạng thái chờ đồng bộ/offline.
+- Chế độ lịch trên máy dùng được khi chưa có Firebase. Lịch này tách riêng khỏi lịch tài khoản.
+- Workflow macOS kiểm thử logic rồi archive và đóng gói `Timezy-unsigned.ipa` để tự ký.
 
-Đối tượng: học sinh, sinh viên, người đi làm hay quên deadline, lịch họp, lịch học,
-lịch khám bệnh, việc gia đình...
+## Bắt đầu
 
-## Tính năng chính
+Đọc **[hướng dẫn Firebase, build IPA và tự ký](docs/SETUP.vi.md)**.
 
-### 1. Cuốn lịch + nhắc nhở
+Trên Mac có Xcode 26.2, Node 22+ và XcodeGen:
 
-- Xem lịch trình theo **ngày / tuần / tháng**.
-- Mỗi sự kiện gồm: tên, ngày giờ bắt đầu – kết thúc, địa điểm, ghi chú, lặp lại (hằng ngày, hằng tuần...).
-- **Nhắc trước sự kiện**: ví dụ trước 10 phút, 30 phút, 1 giờ, 1 ngày (người dùng tự chọn).
-- Nhắc bằng **local notification** (không cần server), chạy offline sau khi đã tạo lịch.
-- Đánh dấu đã xong / bỏ lỡ, xem lại lịch sử.
-
-### 2. Ba cách thêm sự kiện
-
-#### Cách 1 — Nhập thủ công (form chuẩn)
-
-- Người dùng tự điền: tên sự kiện, ngày giờ, địa điểm, ghi chú, nhắc trước bao lâu.
-- Phù hợp khi cần chính xác tuyệt đối.
-
-#### Cách 2 — Nhập text, app tự nhận diện (AI parse)
-
-- Người dùng paste / gõ 1 đoạn text chứa nội dung sự kiện + ngày giờ.
-- Ví dụ nhập:
-  > "Họp nhóm môn CNPM lúc 9h sáng mai tại phòng A2, nhớ mang laptop"
-- App dùng AI trích xuất thành lịch trình có cấu trúc:
-  - Tên: Họp nhóm môn CNPM
-  - Bắt đầu: 09:00 ngày mai
-  - Địa điểm: phòng A2
-  - Ghi chú: nhớ mang laptop
-  - Nhắc trước: 30 phút (mặc định)
-- Người dùng **xem lại và xác nhận** trước khi lưu (tránh AI đoán sai).
-
-#### Cách 3 — Giọng nói, tự thêm lịch (Speech → AI parse)
-
-- Người dùng bấm nút mic và nói, ví dụ:
-  > "Nhắc mình đi khám răng lúc 2 giờ chiều thứ 7 này"
-- App chuyển giọng nói thành text (Speech Recognition của iOS),
-  sau đó dùng AI trích xuất ngày giờ + nội dung như Cách 2.
-- Người dùng xem lại và xác nhận rồi mới lưu.
-
-### 3. Tích hợp AI do người dùng tự cấu hình (API Key)
-
-- App **không hardcode** API key. Người dùng tự nhập key của mình trong màn hình Cài đặt.
-- Hỗ trợ tối thiểu:
-  - OpenAI (GPT) — `https://api.openai.com/v1`
-  - Gemini (Google AI Studio) — `https://generativelanguage.googleapis.com`
-- (Mở rộng sau: Claude / OpenRouter / endpoint tương thích OpenAI.)
-- API key **chỉ lưu trên máy** (Keychain), không gửi đi đâu ngoài nhà cung cấp AI mà người dùng chọn.
-- Khi chưa nhập key: Cách 1 (thủ công) vẫn dùng bình thường, Cách 2 và 3 chuyển sang
-  chế độ **tách ngày giờ đơn giản không dùng AI** (regex cơ bản) + báo rõ cho người dùng.
-
-Luồng xử lý chung cho Cách 2 và 3:
-
-```text
-Text / Voice → Speech-to-Text (iOS) → AI parse (dùng key người dùng)
-→ Event draft (tên, start, end, địa điểm, nhắc trước) → Người dùng xác nhận → Lưu + đặt nhắc
-```
-
-## Ví dụ input → output
-
-| Người dùng nhập / nói | App hiểu |
-|---|---|
-| "Họp lớp 8h sáng mai" | Tên: Họp lớp, bắt đầu: 08:00 ngày mai, nhắc trước 30 phút |
-| "Deadline báo cáo Lab 2 trước 23h59 ngày 20/11" | Tên: Deadline báo cáo Lab 2, hạn: 23:59 20/11, nhắc trước 1 ngày + 1 giờ |
-| "Uống thuốc lúc 7h sáng mỗi ngày" | Tên: Uống thuốc, lặp: hằng ngày 07:00 |
-
-> Ngày giờ tương đối ("mai", "thứ 7 này", "tuần sau") do AI chuẩn hóa theo múi giờ máy.
-
-## Quyền iOS cần xin
-
-- **Notifications**: để nhắc trước giờ diễn ra.
-- **Speech Recognition + Microphone**: cho cách thêm bằng giọng nói.
-- (Tùy chọn sau này) **Calendar (EventKit)**: đồng bộ 2 chiều với Lịch iPhone.
-
-## Kiến trúc dự kiến (khi code bản lịch)
-
-```text
-Timezy/
-├── README.md
-├── project.yml
-├── Sources/
-│   ├── TimezyApp.swift
-│   ├── ContentView.swift          # Tab: Lịch / Thêm nhanh / Cài đặt
-│   ├── Models/
-│   │   └── CalendarEvent.swift    # tên, start, end, địa điểm, nhắc trước, lặp lại
-│   ├── Services/
-│   │   ├── AIProvider.swift       # gọi OpenAI / Gemini bằng key người dùng
-│   │   ├── EventParserService.swift # text → CalendarEvent draft
-│   │   ├── SpeechService.swift    # giọng nói → text
-│   │   └── NotificationManager.swift # đặt / hủy nhắc lịch
-│   ├── ViewModels/
-│   │   ├── EventListViewModel.swift
-│   │   ├── QuickAddViewModel.swift # nhập text / voice
-│   │   └── SettingsViewModel.swift # lưu API key vào Keychain
-│   └── Views/
-│       ├── CalendarView.swift
-│       ├── QuickAddView.swift
-│       └── SettingsView.swift
-└── .github/workflows/ios-build.yml
-```
-
-> Ghi chú: source hiện tại trong `Sources/` vẫn là bản Pomodoro/Task cũ.
-> README này là spec chốt để refactor sang bản lịch ở bước tiếp theo.
-
-## Roadmap
-
-- [ ] v1: nhập thủ công + xem lịch ngày/tuần + nhắc local
-- [ ] v2: nhập text → AI parse (cấu hình OpenAI/Gemini key)
-- [ ] v3: nhập bằng giọng nói (Speech + AI parse)
-- [ ] v4: lặp lại, đồng bộ Lịch iPhone, widget màn hình khóa
-
-## Cách build ra IPA
-
-### Option A — Có máy Mac + Xcode (khuyến nghị)
-
-```bash
-# 1. Cài xcodegen
-brew install xcodegen
-
-# 2. Sinh project
-cd Timezy
+```sh
+node scripts/prepare-config.mjs
 xcodegen generate
-
-# 3. Mở bằng Xcode, chọn team của bạn (Apple ID miễn phí cũng được)
 open Timezy.xcodeproj
-# Product > Archive > Distribute App > Development / Ad Hoc
 ```
 
-> - Apple ID **miễn phí**: ký được, cài lên iPhone thật qua Xcode/Sideloadly,
->   chứng chỉ hết hạn sau **7 ngày** → cắm máy build lại.
-> - Apple Developer **$99/năm**: mới up được TestFlight/App Store,
->   chứng chỉ 1 năm, không giới hạn 7 ngày.
+Chưa có Firebase vẫn build được bản lịch trên máy. Để Google login và đồng bộ hoạt động, cần tạo dự án Firebase, bật Google Authentication, tạo Firestore, triển khai rules, thêm plist đúng bundle ID rồi build lại.
 
-### Option B — Không có máy Mac (build trên mây)
+## Kiểm tra
 
-1. Push thư mục này lên GitHub.
-2. Workflow `ios-build.yml` sẽ tự chạy `xcodebuild` trên `macos-15`,
-   xuất ra file `Timezy-unsigned.ipa` ở mục Artifacts.
-3. Tải IPA về → tự ký bằng **Sideloadly / AltStore / SideStore**
-   với Apple ID miễn phí → cài lên iPhone.
+```sh
+node --test Tests/prepare-config.test.mjs
+swift test
+```
 
-> IPA unsigned **chưa cài trực tiếp** được, bắt buộc phải ký trước khi cài.
-> Muốn cài thẳng không cần ký lại thì phải có tài khoản Developer trả phí.
+`swift test` kiểm tra logic thuần Foundation: ngày giờ, múi giờ, lịch lặp qua DST, giới hạn lời nhắc và giải mã kết quả AI. Build iOS thực tế vẫn cần Xcode. Xem [trạng thái kiểm chứng và kịch bản thử trên iPhone](docs/VALIDATION.vi.md).
 
-### Option C — Thuê Mac đám mây (MacStadium, MacinCloud, AWS EC2 Mac)
+## Phạm vi và giới hạn thực tế
 
-Thuê theo giờ, remote vào, làm y như Option A.
+- **Chưa có IPA được build trong phiên Windows này.** Có source và workflow tạo IPA; chưa được kiểm chứng qua Xcode hoặc trên thiết bị.
+- Không thể bảo đảm mọi câu nói tiếng Việt được nhận diện đúng. Bản chép cho sửa, AI được yêu cầu hỏi lại câu mơ hồ; kết quả luôn phải xác nhận.
+- Không có giao thức API chung cho mọi nhà cung cấp. Ba giao thức ở trên đã được triển khai; dịch vụ dùng giao thức riêng cần adapter mới. Chưa kiểm thử gọi API thật vì không có key/model người dùng.
+- Speech dùng Apple, không truyền âm thanh sang từng nhà cung cấp LLM. LLM nhận văn bản đã chép.
+- Tối đa 60 lời nhắc gần nhất trong vòng 1 năm; bổ sung khi mở app, khi lịch thay đổi và sau khi bật quyền thông báo. Không bảo đảm lời nhắc xa vô hạn khi app không được mở lại.
+- Đồng bộ khi app hoạt động/có mạng; chưa có push server để làm mới lịch trên thiết bị đang đóng app. Thay đổi trên máy A cần máy B mở app để cập nhật lời nhắc.
+- Cùng sửa một sự kiện trên hai thiết bị: Firestore áp dụng lần ghi được máy chủ chấp nhận sau cùng.
+- Lặp chỉ hằng ngày/hằng tuần; sửa hoặc xóa áp dụng toàn bộ chuỗi. Chưa có lặp tháng, âm lịch, ngoại lệ từng lần hay Google Calendar/EventKit.
+- Tự ký cần giữ bundle ID phù hợp cấu hình OAuth; nếu công cụ ký đổi bundle ID, phải đăng ký lại cấu hình tương ứng. IPA chưa ký không cài trực tiếp.
+
+## Thiết kế
+
+Tham chiếu trong [docs/design](docs/design), được tạo bằng imagegen-frontend-mobile. Đây là ảnh concept với dữ liệu minh họa, **không phải screenshot app chạy**. Mã SwiftUI dùng SF, nền than, điểm nhấn bạc hà, sheet/form native, Dynamic Type và giảm chuyển động. Quyết định thiết kế: [DESIGN.vi.md](docs/DESIGN.vi.md).
+
+## Cấu trúc
+
+```text
+Sources/Core/           Mô hình lịch, parse, lên kế hoạch lời nhắc
+Sources/Services/       Firebase, Google auth, Apple Speech, Keychain, AI
+Sources/Views/          Lịch, thêm nhanh, xem trước, cài đặt, đăng nhập
+Sources/Resources/      Icon, privacy manifest, Firebase plist nếu đã cấu hình
+Config/                 Plist Firebase đầu vào (không commit)
+firebase/               Firestore rules
+Tests/                  Swift core tests và Node config tests
+scripts/                Chuẩn bị cấu hình, kiểm tra cú pháp tùy chọn
+```

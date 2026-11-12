@@ -5,13 +5,48 @@ name: iOS Build (unsigned IPA)
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Kiểm thử logic lịch, múi giờ và nhắc lịch
+        run: |
+          node --test Tests/prepare-config.test.mjs
+          swift test
+
+      - name: Đọc Firebase config nếu đã thiết lập
+        env:
+          FIREBASE_IOS_PLIST_BASE64: ${{ secrets.FIREBASE_IOS_PLIST_BASE64 }}
+        run: |
+          python3 - <<'PY'
+          import os, base64, pathlib
+          value = os.environ.get('FIREBASE_IOS_PLIST_BASE64', '')
+          if value:
+              target = pathlib.Path('Config/GoogleService-Info.plist')
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(base64.b64decode(value, validate=True))
+          PY
+          node scripts/prepare-config.mjs
+          plutil -lint Config/Info.plist
 
       - name: Cài xcodegen
         run: brew install xcodegen
@@ -26,6 +61,7 @@ jobs:
             -project Timezy.xcodeproj \
             -scheme Timezy \
             -configuration Release \
+            -destination 'generic/platform=iOS' \
             -archivePath build/Timezy.xcarchive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
@@ -35,9 +71,14 @@ jobs:
           mkdir -p Payload
           cp -R build/Timezy.xcarchive/Products/Applications/Timezy.app Payload/
           zip -r Timezy-unsigned.ipa Payload
+          shasum -a 256 Timezy-unsigned.ipa > Timezy-unsigned.ipa.sha256
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: Timezy-unsigned
-          path: Timezy-unsigned.ipa
+          path: |
+            Timezy-unsigned.ipa
+            Timezy-unsigned.ipa.sha256
+          if-no-files-found: error
+          retention-days: 7

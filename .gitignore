@@ -34,3 +34,11 @@ Payload/
 
 # GitHub Actions local
 .env
+Config/GoogleService-Info.plist
+Config/Info.plist
+Sources/Resources/GoogleService-Info.plist
+.firebase/
+firebase-debug.log
+firestore-debug.log
+node_modules/
+.validation/
